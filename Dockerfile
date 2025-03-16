@@ -9,7 +9,8 @@ RUN go mod download
 COPY cmd/ cmd/
 RUN CGO_ENABLED=0 go build -o main ./cmd/semver/main.go
 
-FROM scratch
+FROM alpine
+RUN apk update && apk add git
 
 COPY --from=builder /usr/src/app/main /main
 
