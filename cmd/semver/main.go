@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"net/http"
 	"os"
@@ -18,7 +19,13 @@ var (
 func main() {
 	ctx := context.Background()
 
-	repo, err := github.NewRepository(&http.Client{}, ghRepo)
+	repo, err := github.NewRepository(&http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}, ghRepo)
 	if err != nil {
 		fmt.Printf("could not create repository: %s", err)
 		os.Exit(1)
