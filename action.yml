@@ -1,7 +1,11 @@
 name: semver
-outputs:
-  version:
-    description: The updated version
+inputs:
+  output-name:
+    description: The Actions output name containing the updated version
+    default: new-version
+    required: false
 runs:
   using: docker
   image: Dockerfile
+  args:
+    - "-output-name=${{ inputs.output-name }}"
