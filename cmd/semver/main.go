@@ -1,23 +1,35 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
-	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/google/go-github/v39/github"
+)
+
+var (
+	ghOwner = os.Getenv("GITHUB_REPOSITORY_OWNER")
+	ghRepo  = os.Getenv("GITHUB_REPOSITORY")
+	ghSha   = os.Getenv("GITHUB_SHA")
 )
 
 func main() {
-	commit, err := getLatestCommit()
+	ctx := context.Background()
+	client := github.NewClient(&http.Client{})
+
+	commit, err := getLatestCommit(ctx, client)
 	if err != nil {
 		fmt.Printf("could not parse latest commit: %s", err)
 		os.Exit(1)
 	}
 
-	version, err := getLatestVersion()
+	version, err := getLatestVersion(ctx, client)
 	if err != nil {
 		fmt.Printf("could not get latest version: %s", err)
 		os.Exit(1)
@@ -76,14 +88,13 @@ func NewCommitFromString(str string) (*Commit, error) {
 	return c, nil
 }
 
-func getLatestCommit() (*Commit, error) {
-	cmd := exec.Command("git", "show", "-s", "--format=%s")
-	output, err := cmd.Output()
+func getLatestCommit(ctx context.Context, client *github.Client) (*Commit, error) {
+	c, _, err := client.Repositories.GetCommit(ctx, ghOwner, ghRepo, ghSha, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error running git show: %w", err)
+		return nil, fmt.Errorf("error getting commit: %w", err)
 	}
 
-	commit, err := NewCommitFromString(strings.TrimSpace(string(output)))
+	commit, err := NewCommitFromString(strings.TrimSpace(*c.Commit.Message))
 	if err != nil {
 		return nil, fmt.Errorf("error reading commit: %w", err)
 	}
@@ -146,14 +157,18 @@ func NewVersionFromString(str string) (*Version, error) {
 	}, nil
 }
 
-func getLatestVersion() (*Version, error) {
-	cmd := exec.Command("git", "describe", "--tags", "--abbrev=0")
-	output, err := cmd.Output()
+func getLatestVersion(ctx context.Context, client *github.Client) (*Version, error) {
+	tags, _, err := client.Repositories.ListTags(ctx, ghOwner, ghRepo, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error running git describe: %w", err)
+		return nil, fmt.Errorf("error getting tags: %w", err)
 	}
 
-	version, err := NewVersionFromString(string(output))
+	tag := "v0.0.0"
+	if len(tags) > 0 {
+		tag = *tags[0].Name
+	}
+
+	version, err := NewVersionFromString(tag)
 	if err != nil {
 		return nil, fmt.Errorf("error reading version: %w", err)
 	}
