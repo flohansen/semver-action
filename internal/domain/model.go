@@ -77,15 +77,17 @@ func (c *Commit) String() string {
 	return c.Raw
 }
 
-func NewCommitFromString(str string) (*Commit, error) {
+func NewCommitFromString(str string) (Commit, error) {
 	match := convCommReg.FindStringSubmatch(str)
 	if len(match) == 0 {
-		return nil, errors.New("invalid commit message")
+		return Commit{}, errors.New("invalid commit message")
 	}
 
-	c := &Commit{}
-	c.Raw = str
-	c.Type = strings.ToLower(match[1])
-	c.IsBreaking = c.Type == "breaking change" || match[2] == "!"
-	return c, nil
+	commitType := strings.ToLower(match[1])
+
+	return Commit{
+		Raw:        str,
+		Type:       commitType,
+		IsBreaking: commitType == "breaking change" || match[2] == "!",
+	}, nil
 }

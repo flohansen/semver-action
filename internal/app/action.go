@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -14,9 +15,10 @@ import (
 )
 
 var (
-	ghRepo   = os.Getenv("GITHUB_REPOSITORY")
-	ghSha    = os.Getenv("GITHUB_SHA")
-	ghOutput = os.Getenv("GITHUB_OUTPUT")
+	ghRepo      = os.Getenv("GITHUB_REPOSITORY")
+	ghSha       = os.Getenv("GITHUB_SHA")
+	ghOutput    = os.Getenv("GITHUB_OUTPUT")
+	ghEventPath = os.Getenv("GITHUB_EVENT_PATH")
 )
 
 type ActionApp struct {
@@ -24,6 +26,21 @@ type ActionApp struct {
 
 func NewAction() *ActionApp {
 	return &ActionApp{}
+}
+
+func getLatestCommit() (domain.Commit, error) {
+	f, err := os.Open(ghEventPath)
+	if err != nil {
+		return domain.Commit{}, err
+	}
+	defer f.Close()
+
+	var event github.Event
+	if err := json.NewDecoder(f).Decode(&event); err != nil {
+		return domain.Commit{}, err
+	}
+
+	return domain.NewCommitFromString(event.HeadCommit.Message)
 }
 
 func (a *ActionApp) Run(ctx context.Context) error {
@@ -38,7 +55,7 @@ func (a *ActionApp) Run(ctx context.Context) error {
 		return fmt.Errorf("could not create repository: %w", err)
 	}
 
-	commit, err := repo.GetLatestCommit(ctx, ghSha)
+	commit, err := getLatestCommit()
 	if err != nil {
 		return fmt.Errorf("could not parse latest commit: %w", err)
 	}
