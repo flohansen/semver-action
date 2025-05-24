@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/flohansen/semver/internal/domain"
 	"github.com/flohansen/semver/internal/github"
 )
 
@@ -18,18 +19,11 @@ var (
 	ghOutput = os.Getenv("GITHUB_OUTPUT")
 )
 
-type ActionFlags struct {
-	OutputName string
-}
-
 type ActionApp struct {
-	flags ActionFlags
 }
 
-func NewAction(flags ActionFlags) *ActionApp {
-	return &ActionApp{
-		flags: flags,
-	}
+func NewAction() *ActionApp {
+	return &ActionApp{}
 }
 
 func (a *ActionApp) Run(ctx context.Context) error {
@@ -49,23 +43,28 @@ func (a *ActionApp) Run(ctx context.Context) error {
 		return fmt.Errorf("could not parse latest commit: %w", err)
 	}
 
-	version, err := repo.GetLatestVersion(ctx)
+	currentVersion, err := repo.GetLatestVersion(ctx)
 	if err != nil {
 		return fmt.Errorf("could not get latest version: %w", err)
 	}
+	newVersion := domain.Version{
+		Major: currentVersion.Major,
+		Minor: currentVersion.Minor,
+		Patch: currentVersion.Patch,
+	}
 
-	fmt.Printf("Read current version: \033[32m%s\033[0m\n", version)
+	fmt.Printf("Read current version: \033[32m%s\033[0m\n", currentVersion)
 	fmt.Printf("Determine new version based on commit: \033[32m%s\033[0m\n", commit)
 
 	if commit.IsBreaking {
-		version.IncMajor()
+		newVersion.IncMajor()
 	} else if commit.Type == "feat" {
-		version.IncMinor()
+		newVersion.IncMinor()
 	} else if commit.Type == "fix" {
-		version.IncPatch()
+		newVersion.IncPatch()
 	}
 
-	fmt.Printf("New version: \033[32m%s\033[0m\n", version)
+	fmt.Printf("New version: \033[32m%s\033[0m\n", newVersion)
 
 	f, err := os.OpenFile(ghOutput, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -73,7 +72,10 @@ func (a *ActionApp) Run(ctx context.Context) error {
 	}
 	defer f.Close()
 
-	if _, err := f.WriteString(fmt.Sprintf("%s=%s\n", a.flags.OutputName, version)); err != nil {
+	if _, err := f.WriteString(fmt.Sprintf("new-release=%v\n", newVersion == *currentVersion)); err != nil {
+		return fmt.Errorf("could not write to GITHUB_OUTPUT: %w", err)
+	}
+	if _, err := f.WriteString(fmt.Sprintf("new-release-version=%s\n", currentVersion)); err != nil {
 		return fmt.Errorf("could not write to GITHUB_OUTPUT: %w", err)
 	}
 

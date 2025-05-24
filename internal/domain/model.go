@@ -31,7 +31,7 @@ func (v *Version) IncPatch() {
 	v.Patch++
 }
 
-func (v *Version) String() string {
+func (v Version) String() string {
 	return fmt.Sprintf("v%d.%d.%d", v.Major, v.Minor, v.Patch)
 }
 
