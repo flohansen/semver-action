@@ -1,4 +1,11 @@
 name: semver
+inputs:
+  token:
+    description: The token used to authenticate
+    default: ""
+    required: false
 runs:
   using: docker
   image: Dockerfile
+  args:
+    - "-token=${{ inputs.token }}"

@@ -3,59 +3,56 @@ package app
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/flohansen/semver/internal/domain"
+	"golang.org/x/oauth2"
+
 	"github.com/flohansen/semver/internal/github"
 )
 
 var (
-	ghRepo      = os.Getenv("GITHUB_REPOSITORY")
-	ghSha       = os.Getenv("GITHUB_SHA")
-	ghOutput    = os.Getenv("GITHUB_OUTPUT")
-	ghEventPath = os.Getenv("GITHUB_EVENT_PATH")
+	ghRepo   = os.Getenv("GITHUB_REPOSITORY")
+	ghSha    = os.Getenv("GITHUB_SHA")
+	ghOutput = os.Getenv("GITHUB_OUTPUT")
 )
 
+type Config struct {
+	Token string
+}
+
 type ActionApp struct {
+	cfg Config
 }
 
-func NewAction() *ActionApp {
-	return &ActionApp{}
-}
-
-func getLatestCommit() (domain.Commit, error) {
-	f, err := os.Open(ghEventPath)
-	if err != nil {
-		return domain.Commit{}, err
+func NewAction(cfg Config) *ActionApp {
+	return &ActionApp{
+		cfg: cfg,
 	}
-	defer f.Close()
-
-	var event github.Event
-	if err := json.NewDecoder(f).Decode(&event); err != nil {
-		return domain.Commit{}, err
-	}
-
-	return domain.NewCommitFromString(event.HeadCommit.Message)
 }
 
 func (a *ActionApp) Run(ctx context.Context) error {
-	repo, err := github.NewRepository(&http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
+	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: a.cfg.Token})
+	tc := &http.Client{
+		Transport: &oauth2.Transport{
+			Source: ts,
+			Base: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
 			},
 		},
-	}, ghRepo)
+	}
+
+	repo, err := github.NewRepository(tc, ghRepo)
 	if err != nil {
 		return fmt.Errorf("could not create repository: %w", err)
 	}
 
-	commit, err := getLatestCommit()
+	commit, err := repo.GetLatestCommit(ctx, ghSha)
 	if err != nil {
 		return fmt.Errorf("could not parse latest commit: %w", err)
 	}
@@ -64,15 +61,11 @@ func (a *ActionApp) Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not get latest version: %w", err)
 	}
-	newVersion := domain.Version{
-		Major: currentVersion.Major,
-		Minor: currentVersion.Minor,
-		Patch: currentVersion.Patch,
-	}
 
 	fmt.Printf("Read current version: \033[32m%s\033[0m\n", currentVersion)
 	fmt.Printf("Determine new version based on commit: \033[32m%s\033[0m\n", commit)
 
+	newVersion := currentVersion
 	if commit.IsBreaking {
 		newVersion.IncMajor()
 	} else if commit.Type == "feat" {
@@ -89,10 +82,14 @@ func (a *ActionApp) Run(ctx context.Context) error {
 	}
 	defer f.Close()
 
-	if _, err := f.WriteString(fmt.Sprintf("new-release=%v\n", newVersion == *currentVersion)); err != nil {
+	fmt.Printf("Outputs:\n")
+	fmt.Printf("  new-release: \033[32m%v\033[0m\n", newVersion != currentVersion)
+	fmt.Printf("  new-release-version: \033[32m%s\033[0m\n", newVersion)
+
+	if _, err := f.WriteString(fmt.Sprintf("new-release=%v\n", newVersion != currentVersion)); err != nil {
 		return fmt.Errorf("could not write to GITHUB_OUTPUT: %w", err)
 	}
-	if _, err := f.WriteString(fmt.Sprintf("new-release-version=%s\n", currentVersion)); err != nil {
+	if _, err := f.WriteString(fmt.Sprintf("new-release-version=%s\n", newVersion)); err != nil {
 		return fmt.Errorf("could not write to GITHUB_OUTPUT: %w", err)
 	}
 

@@ -35,28 +35,28 @@ func (v Version) String() string {
 	return fmt.Sprintf("v%d.%d.%d", v.Major, v.Minor, v.Patch)
 }
 
-func NewVersionFromString(str string) (*Version, error) {
+func NewVersionFromString(str string) (Version, error) {
 	match := verReg.FindStringSubmatch(str)
 	if len(match) == 0 {
-		return nil, errors.New("invalid version string")
+		return Version{}, errors.New("invalid version string")
 	}
 
 	major, err := strconv.Atoi(match[2])
 	if err != nil {
-		return nil, fmt.Errorf("could not parse major version: %w", err)
+		return Version{}, fmt.Errorf("could not parse major version: %w", err)
 	}
 
 	minor, err := strconv.Atoi(match[3])
 	if err != nil {
-		return nil, fmt.Errorf("could not parse minot version: %w", err)
+		return Version{}, fmt.Errorf("could not parse minot version: %w", err)
 	}
 
 	patch, err := strconv.Atoi(match[4])
 	if err != nil {
-		return nil, fmt.Errorf("could not parse patch version: %w", err)
+		return Version{}, fmt.Errorf("could not parse patch version: %w", err)
 	}
 
-	return &Version{
+	return Version{
 		Major: major,
 		Minor: minor,
 		Patch: patch,
@@ -73,7 +73,7 @@ type Commit struct {
 	IsBreaking bool
 }
 
-func (c *Commit) String() string {
+func (c Commit) String() string {
 	return c.Raw
 }
 
