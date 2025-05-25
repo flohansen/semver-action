@@ -1,5 +1,7 @@
 # SemVer GitHub Action
 
+![example output](docs/img/example_output.png)
+
 ## Usage
 
 ```yaml
