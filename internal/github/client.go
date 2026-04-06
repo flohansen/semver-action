@@ -41,7 +41,7 @@ func (r *Repository) GetLatestVersion(ctx context.Context) (domain.Version, erro
 		tag = *tags[0].Name
 	}
 
-	version, err := domain.NewVersionFromString(tag)
+	version, err := domain.DecodeVersionFromString(tag)
 	if err != nil {
 		return domain.Version{}, fmt.Errorf("error reading version: %w", err)
 	}
@@ -55,7 +55,7 @@ func (r *Repository) GetLatestCommit(ctx context.Context, sha string) (domain.Co
 		return domain.Commit{}, fmt.Errorf("error getting commit: %w", err)
 	}
 
-	commit, err := domain.NewCommitFromString(strings.TrimSpace(*c.Commit.Message))
+	commit, err := domain.DecodeCommitFromString(strings.TrimSpace(*c.Commit.Message))
 	if err != nil {
 		return domain.Commit{}, fmt.Errorf("error reading commit: %w", err)
 	}

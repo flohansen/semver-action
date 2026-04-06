@@ -65,14 +65,7 @@ func (a *ActionApp) Run(ctx context.Context) error {
 	fmt.Printf("Read current version: \033[32m%s\033[0m\n", currentVersion)
 	fmt.Printf("Determine new version based on commit: \033[32m%s\033[0m\n", commit)
 
-	newVersion := currentVersion
-	if commit.IsBreaking {
-		newVersion.IncMajor()
-	} else if commit.Type == "feat" {
-		newVersion.IncMinor()
-	} else if commit.Type == "fix" {
-		newVersion.IncPatch()
-	}
+	newVersion := currentVersion.IncByCommit(commit)
 
 	fmt.Printf("New version: \033[32m%s\033[0m\n", newVersion)
 
@@ -86,10 +79,10 @@ func (a *ActionApp) Run(ctx context.Context) error {
 	fmt.Printf("  new-release: \033[32m%v\033[0m\n", newVersion != currentVersion)
 	fmt.Printf("  new-release-version: \033[32m%s\033[0m\n", newVersion)
 
-	if _, err := f.WriteString(fmt.Sprintf("new-release=%v\n", newVersion != currentVersion)); err != nil {
+	if _, err := fmt.Fprintf(f, "new-release=%v\n", newVersion != currentVersion); err != nil {
 		return fmt.Errorf("could not write to GITHUB_OUTPUT: %w", err)
 	}
-	if _, err := f.WriteString(fmt.Sprintf("new-release-version=%s\n", newVersion)); err != nil {
+	if _, err := fmt.Fprintf(f, "new-release-version=%s\n", newVersion); err != nil {
 		return fmt.Errorf("could not write to GITHUB_OUTPUT: %w", err)
 	}
 
